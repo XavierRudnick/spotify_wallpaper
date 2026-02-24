@@ -59,7 +59,8 @@ function makeRuntimeRow(row) {
     entryPeekRatio: 0.5,
     applyTimer: 0,
     maxTileCount: 0,
-    leftBufferTiles: LEFT_BUFFER_TILES
+    leftBufferTiles: LEFT_BUFFER_TILES,
+    applyRevision: 0
   };
 }
 
@@ -240,11 +241,20 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
 
   const hydrateRowProgressively = (row) => {
     clearRowApplyTimer(row);
+    row.applyRevision += 1;
+    const revision = row.applyRevision;
 
     const tiles = Array.from(row.track.children);
+    const baseLeftIndex = row.leftIndex;
+    const poolSize = row.pool.length;
     let cursor = 0;
 
     const step = () => {
+      if (revision !== row.applyRevision) {
+        row.applyTimer = 0;
+        return;
+      }
+
       if (cursor >= tiles.length) {
         row.applyTimer = 0;
         return;
@@ -252,7 +262,7 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
 
       const chunk = 2;
       for (let i = 0; i < chunk && cursor < tiles.length; i += 1) {
-        const poolIndex = (row.leftIndex + cursor) % row.pool.length;
+        const poolIndex = (baseLeftIndex + cursor) % poolSize;
         applyTileData(tiles[cursor], row.pool[poolIndex], 0);
         cursor += 1;
       }
