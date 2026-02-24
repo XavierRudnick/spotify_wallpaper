@@ -3,7 +3,8 @@ import {
   fetchPlaybackState,
   pausePlayback,
   playContext,
-  resumePlayback
+  resumePlayback,
+  skipToNext
 } from "./api.js";
 
 const DEVICE_POLL_MS = 10000;
@@ -77,7 +78,11 @@ export function createPlayerController({ getAccessToken, onState }) {
 
     try {
       const state = await fetchPlaybackState({ accessToken: token });
-      emit({ isPlaying: Boolean(state?.is_playing) });
+      emit({
+        isPlaying: Boolean(state?.is_playing),
+        progressMs: Number(state?.progress_ms ?? 0),
+        durationMs: Number(state?.item?.duration_ms ?? 0)
+      });
       return state;
     } catch {
       return null;
@@ -145,11 +150,37 @@ export function createPlayerController({ getAccessToken, onState }) {
     }
   }
 
+  async function nextTrack() {
+    const token = await authToken();
+    if (!token) {
+      return false;
+    }
+
+    const device = await checkDevice();
+    if (!device) {
+      emit({ noDevice: true });
+      return false;
+    }
+
+    try {
+      await skipToNext({ accessToken: token, deviceId: device.id });
+      window.setTimeout(() => {
+        refreshPlaybackState();
+      }, 280);
+      return true;
+    } catch {
+      emit({ noDevice: true });
+      scheduleDeviceRetry();
+      return false;
+    }
+  }
+
   return {
     checkDevice,
     refreshPlaybackState,
     playAlbum,
     togglePlayPause,
+    nextTrack,
     dispose() {
       disposed = true;
       clearTimeout(noDeviceTimer);

@@ -56,6 +56,8 @@ function makeRuntimeRow(row) {
     pointerId: null,
     pointerX: 0,
     pointerMoved: false,
+    pressedContextUri: "",
+    pressedItemId: "",
     entryPeekRatio: 0.5,
     applyTimer: 0,
     maxTileCount: 0,
@@ -127,10 +129,13 @@ function normalizeOffset(runtimeRow) {
 
 function attachRowInput(runtimeRow, onTileClick) {
   runtimeRow.track.addEventListener("pointerdown", (event) => {
+    const tile = event.target.closest(".tile");
     runtimeRow.pointerActive = true;
     runtimeRow.pointerId = event.pointerId;
     runtimeRow.pointerX = event.clientX;
     runtimeRow.pointerMoved = false;
+    runtimeRow.pressedContextUri = tile?.dataset.contextUri ?? "";
+    runtimeRow.pressedItemId = tile?.dataset.itemId ?? "";
     runtimeRow.dragSpeed = 0;
     runtimeRow.holdAmbientUntil = performance.now() + 1200;
     runtimeRow.track.classList.add("is-dragging");
@@ -158,27 +163,27 @@ function attachRowInput(runtimeRow, onTileClick) {
       return;
     }
 
+    const itemId = runtimeRow.pressedItemId;
+    const contextUri = runtimeRow.pressedContextUri;
+    const shouldPlay = !runtimeRow.pointerMoved && Boolean(contextUri);
     runtimeRow.pointerActive = false;
     runtimeRow.pointerId = null;
     runtimeRow.holdAmbientUntil = performance.now() + 1200;
     runtimeRow.track.classList.remove("is-dragging");
+
+    if (shouldPlay) {
+      onTileClick?.({
+        rowId: runtimeRow.id,
+        itemId,
+        contextUri
+      });
+    }
+    runtimeRow.pressedItemId = "";
+    runtimeRow.pressedContextUri = "";
   };
 
   runtimeRow.track.addEventListener("pointerup", onPointerEnd);
   runtimeRow.track.addEventListener("pointercancel", onPointerEnd);
-
-  runtimeRow.track.addEventListener("click", (event) => {
-    const tile = event.target.closest(".tile");
-    if (!tile || !runtimeRow.track.contains(tile) || runtimeRow.pointerMoved) {
-      return;
-    }
-
-    onTileClick?.({
-      rowId: runtimeRow.id,
-      itemId: tile.dataset.itemId ?? "",
-      contextUri: tile.dataset.contextUri ?? ""
-    });
-  });
 }
 
 export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {

@@ -34,6 +34,10 @@ export async function spotifyPut({ accessToken, path, body }) {
   return spotifyFetch({ accessToken, path, method: "PUT", body });
 }
 
+export async function spotifyPost({ accessToken, path, body }) {
+  return spotifyFetch({ accessToken, path, method: "POST", body });
+}
+
 export async function fetchRecentlyPlayed({ accessToken, limit = 50 }) {
   return spotifyGet({
     accessToken,
@@ -115,5 +119,13 @@ export async function pausePlayback({ accessToken, deviceId }) {
   return spotifyPut({
     accessToken,
     path: `/me/player/pause${query}`
+  });
+}
+
+export async function skipToNext({ accessToken, deviceId }) {
+  const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : "";
+  return spotifyPost({
+    accessToken,
+    path: `/me/player/next${query}`
   });
 }

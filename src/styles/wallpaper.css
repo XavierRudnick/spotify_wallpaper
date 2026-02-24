@@ -112,6 +112,7 @@
   gap: 12px;
   justify-content: center;
   align-items: center;
+  width: min(720px, 92vw);
   padding-bottom: min(2vh, 14px);
 }
 
@@ -143,6 +144,10 @@
   opacity: 0;
 }
 
+.control-skip svg {
+  transform: none;
+}
+
 .control-play.is-playing .icon-play {
   opacity: 0;
 }
@@ -159,6 +164,29 @@
 .control-play.is-no-device {
   background: transparent;
   box-shadow: none;
+}
+
+.control-skip.is-no-device {
+  opacity: 0.45;
+}
+
+.control-progress {
+  flex: 1;
+  max-width: 360px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  margin: 0 6px;
+}
+
+.control-progress-fill {
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: rgba(255, 255, 255, 0.95);
+  transition: transform 160ms linear;
 }
 
 .control-status {
@@ -209,7 +237,8 @@
   .tile,
   .tile-cover,
   .control-button,
-  .control-status {
+  .control-status,
+  .control-progress-fill {
     transition: none;
   }
 
@@ -221,7 +250,8 @@
 body.reduced-motion .tile,
 body.reduced-motion .tile-cover,
 body.reduced-motion .control-button,
-body.reduced-motion .control-status {
+body.reduced-motion .control-status,
+body.reduced-motion .control-progress-fill {
   transition: none;
 }
 

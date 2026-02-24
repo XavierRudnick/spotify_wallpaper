@@ -23,10 +23,28 @@ export function createPlayerControlsShell() {
     </svg>
   `;
 
+  const skipButton = document.createElement("button");
+  skipButton.type = "button";
+  skipButton.className = "control-button control-skip";
+  skipButton.setAttribute("aria-label", "skip-next");
+  skipButton.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 6v12l8-6-8-6zM14 6v12l8-6-8-6z"></path>
+    </svg>
+  `;
+
+  const progress = document.createElement("div");
+  progress.className = "control-progress";
+  progress.setAttribute("aria-hidden", "true");
+
+  const progressFill = document.createElement("div");
+  progressFill.className = "control-progress-fill";
+  progress.appendChild(progressFill);
+
   const statusDot = document.createElement("span");
   statusDot.className = "control-status";
   statusDot.setAttribute("aria-hidden", "true");
 
-  controls.append(connectButton, playButton, statusDot);
-  return { controls, connectButton, playButton, statusDot };
+  controls.append(connectButton, playButton, skipButton, progress, statusDot);
+  return { controls, connectButton, playButton, skipButton, progressFill, statusDot };
 }

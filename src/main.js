@@ -33,7 +33,8 @@ const reducedMotion = resolveReducedMotion();
 document.body.classList.toggle("reduced-motion", reducedMotion);
 
 const { element: rowsSection, rows } = createRowsShell();
-const { controls: controlsSection, connectButton, playButton, statusDot } = createPlayerControlsShell();
+const { controls: controlsSection, connectButton, playButton, skipButton, progressFill, statusDot } =
+  createPlayerControlsShell();
 
 wallpaper.append(rowsSection, controlsSection);
 
@@ -41,6 +42,54 @@ enforceIconOnlyUi(document.body);
 wireRowHoverState(rows);
 
 let player = null;
+let playbackTicker = 0;
+let playbackPollTimer = 0;
+let progressModel = {
+  isPlaying: false,
+  progressMs: 0,
+  durationMs: 0,
+  stamp: performance.now()
+};
+
+function stopPlaybackLoops() {
+  if (playbackTicker) {
+    window.cancelAnimationFrame(playbackTicker);
+    playbackTicker = 0;
+  }
+  clearInterval(playbackPollTimer);
+  playbackPollTimer = 0;
+}
+
+function renderProgress(now = performance.now()) {
+  const elapsed = progressModel.isPlaying ? now - progressModel.stamp : 0;
+  const current = Math.min(progressModel.durationMs, progressModel.progressMs + elapsed);
+  const ratio = progressModel.durationMs > 0 ? current / progressModel.durationMs : 0;
+  progressFill.style.transform = `scaleX(${Math.max(0, Math.min(1, ratio)).toFixed(4)})`;
+}
+
+function startPlaybackTicker() {
+  if (playbackTicker) {
+    return;
+  }
+
+  const loop = (now) => {
+    renderProgress(now);
+    playbackTicker = window.requestAnimationFrame(loop);
+  };
+
+  playbackTicker = window.requestAnimationFrame(loop);
+}
+
+function startPlaybackPoll() {
+  if (playbackPollTimer || !player) {
+    return;
+  }
+
+  playbackPollTimer = window.setInterval(() => {
+    player?.refreshPlaybackState();
+  }, 5000);
+}
+
 const runtime = startRowScroller(rows, {
   motionFactor: reducedMotion ? 0.35 : 1,
   onTileClick: ({ contextUri }) => {
@@ -78,12 +127,26 @@ function paintAuthState(state) {
   statusDot.classList.toggle("is-warning", Boolean(state.noDevice));
   connectButton.classList.toggle("is-ready", state.connected);
   playButton.classList.toggle("is-ready", state.connected && !state.noDevice);
+  skipButton.classList.toggle("is-ready", state.connected && !state.noDevice);
 }
 
 function paintPlaybackState(state) {
   playButton.classList.toggle("is-playing", Boolean(state.isPlaying));
   playButton.classList.toggle("is-no-device", Boolean(state.noDevice));
+  skipButton.classList.toggle("is-no-device", Boolean(state.noDevice));
   statusDot.classList.toggle("is-warning", Boolean(state.noDevice));
+
+  if (typeof state.progressMs === "number") {
+    progressModel.progressMs = Math.max(0, state.progressMs);
+  }
+  if (typeof state.durationMs === "number") {
+    progressModel.durationMs = Math.max(0, state.durationMs);
+  }
+  if (typeof state.isPlaying === "boolean") {
+    progressModel.isPlaying = state.isPlaying;
+  }
+  progressModel.stamp = performance.now();
+  renderProgress(progressModel.stamp);
 }
 
 async function initAuth() {
@@ -110,6 +173,7 @@ async function initAuth() {
   paintAuthState(authState);
   if (auth.status().connected) {
     player?.dispose();
+    stopPlaybackLoops();
     player = createPlayerController({
       getAccessToken: auth.getAccessToken,
       onState: (state) => {
@@ -119,11 +183,16 @@ async function initAuth() {
     });
     player.checkDevice();
     player.refreshPlaybackState();
+    startPlaybackTicker();
+    startPlaybackPoll();
     startSync();
   }
 
   playButton.addEventListener("click", async () => {
     await player?.togglePlayPause();
+  });
+  skipButton.addEventListener("click", async () => {
+    await player?.nextTrack();
   });
 
   connectButton.addEventListener("click", async () => {
@@ -137,6 +206,7 @@ async function initAuth() {
       sync?.stop();
       player?.dispose();
       player = null;
+      stopPlaybackLoops();
       paintPlaybackState({ isPlaying: false, noDevice: false });
       paintAuthState(auth.status());
       return;
