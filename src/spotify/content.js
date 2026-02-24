@@ -13,7 +13,7 @@ const CACHE_TTL_MS = 20 * 60 * 1000;
 const REFRESH_MS = 20 * 60 * 1000;
 const RETRY_BASE_MS = 2000;
 const RETRY_MAX_MS = 2 * 60 * 1000;
-const PREFETCH_CAP = 24;
+const PREFETCH_CAP = 150;
 let recommendationsDisabled = false;
 
 function uniqueImageUrls(rows) {

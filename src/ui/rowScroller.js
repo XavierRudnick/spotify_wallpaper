@@ -1,3 +1,8 @@
+const PREALLOCATED_TILE_COUNT = 72;
+const ROW_WARMUP_CAP = 120;
+const LEFT_BUFFER_TILES = 6;
+const RIGHT_BUFFER_TILES = 10;
+
 function makeTile() {
   const tile = document.createElement("button");
   tile.type = "button";
@@ -52,7 +57,9 @@ function makeRuntimeRow(row) {
     pointerX: 0,
     pointerMoved: false,
     entryPeekRatio: 0.5,
-    applyTimer: 0
+    applyTimer: 0,
+    maxTileCount: 0,
+    leftBufferTiles: LEFT_BUFFER_TILES
   };
 }
 
@@ -63,17 +70,19 @@ function assignTileCount(runtimeRow) {
   runtimeRow.tileSpan = Math.max(1, tileWidth + gap);
 
   const viewportWidth = runtimeRow.viewport.getBoundingClientRect().width;
-  const needed = Math.max(10, Math.ceil(viewportWidth / runtimeRow.tileSpan) + 6);
+  const needed = Math.max(
+    10,
+    Math.ceil(viewportWidth / runtimeRow.tileSpan) + runtimeRow.leftBufferTiles + RIGHT_BUFFER_TILES
+  );
+  runtimeRow.maxTileCount = Math.max(runtimeRow.maxTileCount, needed, PREALLOCATED_TILE_COUNT);
+  const target = runtimeRow.maxTileCount;
 
-  while (runtimeRow.track.childElementCount < needed) {
+  while (runtimeRow.track.childElementCount < target) {
     const tile = makeTile();
-    const index = (runtimeRow.leftIndex + runtimeRow.track.childElementCount) % runtimeRow.pool.length;
-    applyTileData(tile, runtimeRow.pool[index]);
+    const slot = runtimeRow.track.childElementCount;
+    const index = (runtimeRow.leftIndex + slot) % runtimeRow.pool.length;
+    applyTileData(tile, runtimeRow.pool[index], Math.min(500, slot * 36));
     runtimeRow.track.appendChild(tile);
-  }
-
-  while (runtimeRow.track.childElementCount > needed) {
-    runtimeRow.track.lastElementChild?.remove();
   }
 }
 
@@ -101,13 +110,15 @@ function rotateLeft(runtimeRow) {
 }
 
 function normalizeOffset(runtimeRow) {
-  // Recycle as soon as we reach zero so the left edge never shows empty space.
-  while (runtimeRow.offset >= 0) {
+  const maxOffset = -runtimeRow.tileSpan * runtimeRow.leftBufferTiles;
+  const minOffset = -runtimeRow.tileSpan * (runtimeRow.leftBufferTiles + 1);
+
+  while (runtimeRow.offset >= maxOffset) {
     runtimeRow.offset -= runtimeRow.tileSpan;
     rotateRight(runtimeRow);
   }
 
-  while (runtimeRow.offset <= -runtimeRow.tileSpan) {
+  while (runtimeRow.offset <= minOffset) {
     runtimeRow.offset += runtimeRow.tileSpan;
     rotateLeft(runtimeRow);
   }
@@ -175,7 +186,7 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
 
   for (const row of runtimeRows) {
     assignTileCount(row);
-    row.offset = -row.tileSpan * row.entryPeekRatio;
+    row.offset = -row.tileSpan * (row.leftBufferTiles + row.entryPeekRatio);
     attachRowInput(row, onTileClick);
     row.track.style.transform = `translate3d(${row.offset.toFixed(3)}px, 0, 0)`;
   }
@@ -186,8 +197,13 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
       normalizeOffset(row);
     }
   };
+  let resizeTimer = 0;
+  const onResizeDebounced = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(onResize, 140);
+  };
 
-  window.addEventListener("resize", onResize);
+  window.addEventListener("resize", onResizeDebounced);
 
   let lastTick = performance.now();
   let frameId = 0;
@@ -200,6 +216,26 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
     }
     window.clearTimeout(row.applyTimer);
     row.applyTimer = 0;
+  };
+
+  const warmRowImages = (items) => {
+    const seen = new Set();
+    let count = 0;
+
+    for (const item of items) {
+      const url = item?.imageUrl;
+      if (!url || seen.has(url)) {
+        continue;
+      }
+      seen.add(url);
+      const img = new Image();
+      img.decoding = "async";
+      img.src = url;
+      count += 1;
+      if (count >= ROW_WARMUP_CAP) {
+        break;
+      }
+    }
   };
 
   const hydrateRowProgressively = (row) => {
@@ -277,6 +313,7 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
       }
 
       row.pool = items;
+      warmRowImages(items);
       row.leftIndex = row.leftIndex % row.pool.length;
       assignTileCount(row);
       hydrateRowProgressively(row);
@@ -294,7 +331,8 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
     },
     destroy() {
       stopLoop();
-      window.removeEventListener("resize", onResize);
+      clearTimeout(resizeTimer);
+      window.removeEventListener("resize", onResizeDebounced);
       for (const row of runtimeRows) {
         clearRowApplyTimer(row);
       }
