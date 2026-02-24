@@ -283,7 +283,7 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
       return;
     }
 
-    const deltaSeconds = Math.min(0.04, (now - lastTick) / 1000);
+    const deltaSeconds = Math.min(0.025, (now - lastTick) / 1000);
     lastTick = now;
 
     for (const row of runtimeRows) {

@@ -13,14 +13,14 @@
 .rows {
   width: min(98vw, 1820px);
   display: grid;
-  gap: clamp(22px, 3.6vh, 40px);
+  gap: clamp(28px, 4.2vh, 52px);
 }
 
 .row-lane {
   width: 100%;
   position: relative;
   z-index: 1;
-  padding: 14px 0;
+  padding: 18px 0;
 }
 
 .row-viewport {
@@ -46,7 +46,7 @@
 .tile {
   position: relative;
   flex: 0 0 auto;
-  width: clamp(144px, 13.5vw, 273px);
+  width: clamp(158px, 14.8vw, 300px);
   aspect-ratio: 1 / 1;
   border-radius: 10px;
   overflow: hidden;

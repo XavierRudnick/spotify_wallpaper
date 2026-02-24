@@ -1,7 +1,7 @@
 const ROW_BLUEPRINTS = [
-  { id: "recent", speed: 13 },
-  { id: "saved", speed: 16 },
-  { id: "suggested", speed: 11 }
+  { id: "recent", speed: 26 },
+  { id: "saved", speed: 32 },
+  { id: "suggested", speed: 22 }
 ];
 
 function hashSeed(seed) {

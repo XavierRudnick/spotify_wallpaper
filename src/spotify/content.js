@@ -16,6 +16,11 @@ const RETRY_MAX_MS = 2 * 60 * 1000;
 const PREFETCH_CAP = 150;
 let recommendationsDisabled = false;
 
+function rowSignature(rows) {
+  const key = (items = []) => items.map((item) => item?.id ?? "").join(",");
+  return `r:${key(rows?.recent)}|s:${key(rows?.saved)}|g:${key(rows?.suggested)}`;
+}
+
 function uniqueImageUrls(rows) {
   const urls = [];
   const seen = new Set();
@@ -221,6 +226,16 @@ export function startRowsSync({ getAccessToken, onData, onState }) {
   let cancelled = false;
   let timerId = 0;
   let attempt = 0;
+  let lastSignature = "";
+
+  const emitIfChanged = (rows, meta) => {
+    const signature = rowSignature(rows);
+    if (signature === lastSignature) {
+      return;
+    }
+    lastSignature = signature;
+    onData(rows, meta);
+  };
 
   const schedule = (delayMs) => {
     if (cancelled) {
@@ -248,14 +263,14 @@ export function startRowsSync({ getAccessToken, onData, onState }) {
       const rows = await fetchRowsFromSpotify(accessToken);
       prefetchRowImages(rows);
       writeRowsCache(rows);
-      onData(rows, { source: "network" });
+      emitIfChanged(rows, { source: "network" });
       attempt = 0;
       onState?.({ mode: "ok" });
       schedule(REFRESH_MS);
     } catch {
       const cached = readRowsCache({ allowStale: true });
       if (cached) {
-        onData(cached, { source: "cache" });
+        emitIfChanged(cached, { source: "cache" });
       }
 
       attempt += 1;
