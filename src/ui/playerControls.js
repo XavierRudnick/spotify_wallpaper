@@ -6,6 +6,15 @@ export function createPlayerControlsShell() {
   record.className = "control-record";
   record.setAttribute("aria-hidden", "true");
 
+  const soundbar = document.createElement("div");
+  soundbar.className = "control-soundbar";
+  soundbar.setAttribute("aria-hidden", "true");
+  for (let index = 0; index < 96; index += 1) {
+    const bar = document.createElement("span");
+    bar.className = "control-soundbar-bar";
+    soundbar.appendChild(bar);
+  }
+
   const progress = document.createElement("div");
   progress.className = "control-progress";
   progress.setAttribute("aria-hidden", "true");
@@ -53,6 +62,6 @@ export function createPlayerControlsShell() {
   statusDot.setAttribute("aria-hidden", "true");
 
   buttonRail.append(connectButton, playButton, skipButton);
-  controls.append(record, progress, buttonRail, statusDot);
-  return { controls, record, connectButton, playButton, skipButton, progressFill, statusDot };
+  controls.append(record, soundbar, progress, buttonRail, statusDot);
+  return { controls, record, soundbar, connectButton, playButton, skipButton, progressFill, statusDot };
 }

@@ -20,7 +20,7 @@ function pickAlbumImage(images) {
   if (!Array.isArray(images) || images.length === 0) {
     return "";
   }
-  return images[2]?.url ?? images[1]?.url ?? images[0]?.url ?? "";
+  return images[0]?.url ?? images[1]?.url ?? images[2]?.url ?? "";
 }
 
 export function createPlayerController({ getAccessToken, onState }) {
