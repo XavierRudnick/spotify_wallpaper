@@ -1,271 +1,111 @@
-# Codex Agents — Spotify Wallpaper Engine UI (Option A)
+# AGENTS.md - SpotWall WE
 
-## Project Name
-**SpotWall WE** (working title)
+## 1) Mission
+Build and maintain a Wallpaper Engine HTML wallpaper that shows three animated rows of Spotify album covers and minimal icon-only playback controls.
 
-## One-liner
-A Wallpaper Engine HTML wallpaper that shows three continuously scrolling rows of Spotify album covers (Recent / Saved / Suggested) on a pure black background, with hover + drag interaction and a minimal playback control bar.
+Primary runtime target:
+- Windows 10/11 + Wallpaper Engine (HTML wallpaper mode)
+- Spotify Desktop app as playback device
 
----
+## 2) Current MVP Status
+Implemented:
+- Three continuously scrolling rows of album covers on black background
+- Distinct row directions/speeds:
+  - `recent`: right (`+26`)
+  - `saved`: left (`-26`)
+  - `suggested`: right (`+22`)
+- Hover interaction with center-pop and neighbor spread
+- Hover pauses row motion
+- Drag-to-browse rows
+- Tap album cover to play album context
+- Controls: connect, play/pause, skip-next, status dot, progress bar
+- Spotify PKCE auth with token refresh/persistence
+- Data pipeline: recent/saved/top + suggested fallback when recommendations API fails
+- Cache + retry/backoff + image prefetch
+- Reduced motion support and visibility pause
 
-## Purpose
-Create an **always-on Spotify visual launcher** that lives in **Wallpaper Engine** as an HTML wallpaper. The wallpaper displays **only album cover art** (no text) in three horizontally moving rows. Clicking a cover triggers Spotify playback through Spotify Connect (Spotify app handles audio). A minimal dark play control sits below the rows.
+## 3) Non-Negotiable UX Rules
+- No visible words in wallpaper UI (icons only)
+- Black background
+- Album-art-first experience
+- Smooth motion and low idle overhead
+- Graceful no-device behavior (icon state, no text banners)
 
----
+## 4) Repo Map
+- `src/main.js`
+  - App composition, auth bootstrapping, row sync wiring, control handlers, progress updates
+- `src/ui/rows.js`
+  - Row blueprints (ids + speeds)
+- `src/ui/rowScroller.js`
+  - Infinite row motion, tile recycling, drag behavior, hover pause, tap/drag disambiguation
+- `src/ui/interactions.js`
+  - Icon-only guard + hover class choreography
+- `src/ui/playerControls.js`
+  - Control bar DOM: connect/play/skip/progress/status
+- `src/spotify/auth_pkce.js`
+  - OAuth PKCE flow + token storage + refresh
+- `src/spotify/api.js`
+  - Spotify API wrappers for content and playback endpoints
+- `src/spotify/content.js`
+  - Fetch/normalize/cache/retry/prefetch for row datasets
+- `src/spotify/player.js`
+  - Device detection + play/pause/skip + playback state reads
+- `src/styles/base.css`, `src/styles/wallpaper.css`
+  - Global and wallpaper styling
+- `docs/wallpaper-engine-setup.md`
+  - Local run + build + Wallpaper Engine loading steps
 
-## Target Platform
-- **Windows 10/11**
-- **Wallpaper Engine (Steam)** using an **HTML/JS** wallpaper project
-- Spotify Desktop app recommended for the active playback device
-
----
-
-## UX / Visual Spec (Hard Requirements)
-
-### Layout
-- Fullscreen **solid black background**.
-- **Three horizontal rows** of album covers:
-  1. **Recent** (Spotify recently played)
-  2. **Saved Albums** (user library)
-  3. **Suggested** (recommendations based on seeds)
-- **No words anywhere** in the UI.
-- Only album art tiles + a minimal play control region.
-
-### Motion (Ambient)
-- Each row scrolls **constantly to the right**.
-- As covers exit the right edge, **new covers enter from the left** (infinite loop).
-- Rows move at **different speeds**:
-  - Row 1: slow
-  - Row 2: slightly slower/faster (distinct but still calm)
-  - Row 3: slowest/fastest (distinct but still calm)
-- Motion must remain smooth and low CPU/GPU.
-
-### Interaction
-- On hover:
-  - Album cover “lifts” subtly (scale + glow/shadow or outline).
-  - Neighboring covers may slightly separate or “fan” (subtle).
-- On click:
-  - Plays that album (context play) on Spotify.
-- Row interaction:
-  - User can **drag/slide left or right** to browse manually.
-  - When interacting, the row should:
-    - slow down or pause ambient scrolling
-    - resume smoothly after inactivity
-- Minimal controls below rows:
-  - A **dark play button** (icon only).
-  - Optional additional icons (pause/next/prev) only if they can remain wordless and minimal.
-
----
-
-## Primary Goals (MVP)
-1. **Wallpaper Engine HTML wallpaper runs smoothly**
-   - 60 fps target; minimal repaint.
-   - No heavy frameworks.
-
-2. **Spotify OAuth works reliably**
-   - User connects Spotify once.
-   - Token persistence across restarts.
-
-3. **Content sources**
-   - Recent row: `recently-played`
-   - Saved row: `saved albums`
-   - Suggested row: recommendations API using seeds derived from:
-     - top artists/tracks OR recent items
-
-4. **Playback control**
-   - Click album cover → start playback on Spotify
-   - Global play button:
-     - toggles play/pause (if a device is active)
-
-5. **Device handling**
-   - Detect active Spotify device
-   - If none:
-     - show a minimal icon state (no text) and/or a small “settings overlay” icon
-     - (if text is absolutely disallowed, use a discrete warning dot + tooltip only on hover; default is silent fail with retry)
-
----
-
-## Non-goals (for now)
-- Full Spotify browsing/search
-- Lyrics, track lists, queue UI
-- In-wallpaper audio playback
-- Accounts, cloud backend, database
-- Complex settings menus (keep it minimal)
-
----
-
-## Tech Stack
-
-### Wallpaper Runtime
-- **Wallpaper Engine HTML Wallpaper**
-  - Uses Chromium-based rendering via WE
-  - Supports wallpaper properties and audio visualization hooks (not required)
-
-### Frontend
-- **HTML + CSS + JavaScript**
-- **Vite** bundler for dev/build
-- Animation approach:
-  - CSS transforms + `requestAnimationFrame` only where needed
-  - Prefer `translate3d` for GPU-accelerated movement
-  - Use Intersection / virtualized tiling to avoid huge DOM
-
-### Spotify Integration
-- **Spotify Web API**
-- OAuth 2.0: **Authorization Code with PKCE** (preferred)
-  - Avoid client secret in wallpaper
-- Token storage:
-  - `localStorage` or WE storage mechanisms (if available)
-- Content fetch + caching:
-  - local cache of album art URLs and Spotify URIs
-
----
-
-## Spotify Constraints (Operational)
-- Playback control requires an **active Spotify device** (Spotify desktop app open and active).
-- Playback control may require **Spotify Premium** depending on endpoint behavior and account features.
-- Handle `NO_ACTIVE_DEVICE` and rate limiting gracefully.
-
----
-
-## Required Scopes (MVP)
+## 5) Spotify Contract
+Required scopes:
 - `user-read-recently-played`
 - `user-library-read`
 - `user-read-playback-state`
 - `user-modify-playback-state`
-- For suggested:
-  - `user-top-read` (if using top tracks/artists as recommendation seeds)
+- `user-top-read`
 
-Keep scopes minimal; add only if feature requires it.
+Notes:
+- Use PKCE only in frontend; do not use client secret in this app.
+- Recommendations endpoint may return `404` for some app types; fallback logic is required.
+- Playback requires active Spotify device.
 
----
+## 6) Runbook
+Local dev:
+1. `npm install`
+2. Configure `.env.local`:
+   - `VITE_SPOTIFY_CLIENT_ID=...`
+   - `VITE_SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173/`
+3. `npm run dev`
 
-## Core Endpoints (MVP)
-### Content
-- `GET /v1/me/player/recently-played`
-- `GET /v1/me/albums`
-- `GET /v1/me/top/artists` and/or `GET /v1/me/top/tracks` (for seeds)
-- `GET /v1/recommendations` (suggested row)
+Build:
+1. `npm run build`
+2. Load `dist/index.html` in Wallpaper Engine HTML project
 
-### Playback
-- `GET /v1/me/player`
-- `GET /v1/me/player/devices`
-- `PUT /v1/me/player/play`
-- `PUT /v1/me/player/pause`
+## 7) Agent Workflow (Recommended)
+When making changes:
+1. Read impacted modules first (`main.js` + feature modules).
+2. Keep edits minimal and localized.
+3. Preserve icon-only UI policy.
+4. Avoid adding heavy dependencies/frameworks.
+5. Run `npm run build` before handing off.
+6. Report:
+   - Files changed
+   - Behavior changed
+   - Validation result
 
----
+## 8) Performance Guardrails
+- Prefer transform-based animation; avoid layout thrash in loops.
+- Recycle tiles; do not grow DOM unbounded.
+- Avoid unnecessary row re-application when data unchanged.
+- Pause or reduce work when hidden/reduced-motion.
+- Any CPU/GPU increase must be justified.
 
-## Animation / Rendering Requirements (Performance)
-- Use **one transform layer per row** (not per tile) whenever possible.
-- Keep album cover elements static; move the row container.
-- Use a **circular buffer** approach:
-  - Maintain N visible tiles + small offscreen buffer.
-  - When a tile exits right, recycle it to the left with a new item.
-- Limit row tile count to what’s needed for the screen width + buffer.
-- Avoid layout thrashing:
-  - No continuous reading of layout properties in a loop.
-- Provide a “reduced motion” toggle (optional) if WE users want it.
+## 9) Known Constraints
+- Wallpaper Engine login text input may be unreliable in-wallpaper.
+- OAuth is most reliable when completed in normal browser first.
+- Spotify device availability can be intermittent; no-device handling must stay robust.
 
----
-
-## Data / Cache Strategy
-- Fetch initial sets:
-  - Recent: 30–50 items
-  - Saved: 30–50 items (paged if needed)
-  - Suggested: 30–50 items, refresh seeds periodically
-- Cache:
-  - store cover URLs + Spotify URIs
-  - refresh content every X minutes (e.g., 10–30 minutes)
-- If API fails:
-  - keep showing cached art
-  - retry with exponential backoff
-
----
-
-## Repo Structure (suggested)
-spotwall-we/
-src/
-main.js
-spotify/
-auth_pkce.js
-api.js
-cache.js
-models.js
-ui/
-rows.js
-rowScroller.js
-interactions.js
-playerControls.js
-styles/
-base.css
-wallpaper.css
-public/
-icons/
-docs/
-wallpaper-engine-setup.md
-spotify-setup.md
-troubleshooting.md
-vite.config.js
-package.json
-
-
----
-
-## Development Workflow
-1. Run locally in browser for rapid iteration:
-   - `npm install`
-   - `npm run dev`
-2. Validate OAuth flow in a normal browser first.
-3. Build:
-   - `npm run build`
-4. Load into Wallpaper Engine as an HTML wallpaper:
-   - point WE to the built `index.html`
-5. Test:
-   - idle CPU/GPU
-   - smooth scrolling
-   - hover/drag behavior
-   - click-to-play reliability
-
----
-
-## Milestones
-### M0 — Visual Prototype
-- Black background + 3 rows of placeholder cover art
-- Infinite rightward motion with distinct speeds
-- Hover animation + drag/slide per row
-
-### M1 — Spotify Auth + Real Data
-- PKCE OAuth integrated
-- Rows populate from Spotify endpoints (recent/saved/suggested)
-- Local caching
-
-### M2 — Playback
-- Click cover to play album
-- Play button toggles play/pause
-- Active-device detection and graceful failure behavior
-
-### M3 — Polish + Performance
-- Circular buffer tile recycling
-- Image prefetching and lazy loading
-- Backoff + offline cache behavior
-- Minimal “error state” visuals (icon-only)
-
----
-
-## Definition of Done (MVP)
-- Runs as a Wallpaper Engine HTML wallpaper on Windows.
-- Shows 3 continuously moving rows of album covers (no text).
-- Rows have distinct slow speeds; infinite loop with seamless recycling.
-- Hover and drag-to-browse interactions feel smooth.
-- Clicking an album reliably starts playback on Spotify (when device active).
-- Minimal dark play button below rows toggles play/pause.
-- Low idle resource usage and stable across restarts.
-
----
-
-## Agent Implementation Rules
-- Preserve “no text UI” requirement (icons only).
-- Keep dependencies minimal (avoid React unless absolutely necessary).
-- Prefer GPU-accelerated transforms over per-frame layout updates.
-- Design for “No active device” as the common failure case without adding text.
-- Never store secrets in repo; use PKCE or a localhost-only helper if unavoidable.
-- Any change that increases idle CPU usage must be justified and optionally gated behind a setting.
+## 10) Next Iteration Candidates
+- External-browser auth handoff flow for Wallpaper Engine
+- Optional previous-track icon
+- Optional Wallpaper Engine property bindings (speed/motion/scale)
+- Additional diagnostics toggle for API/device troubleshooting

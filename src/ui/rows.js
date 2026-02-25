@@ -1,6 +1,6 @@
 const ROW_BLUEPRINTS = [
   { id: "recent", speed: 26 },
-  { id: "saved", speed: 32 },
+  { id: "saved", speed: -26 },
   { id: "suggested", speed: 22 }
 ];
 

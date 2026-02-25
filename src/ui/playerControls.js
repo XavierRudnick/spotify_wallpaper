@@ -2,6 +2,21 @@ export function createPlayerControlsShell() {
   const controls = document.createElement("section");
   controls.className = "controls";
 
+  const record = document.createElement("span");
+  record.className = "control-record";
+  record.setAttribute("aria-hidden", "true");
+
+  const progress = document.createElement("div");
+  progress.className = "control-progress";
+  progress.setAttribute("aria-hidden", "true");
+
+  const progressFill = document.createElement("div");
+  progressFill.className = "control-progress-fill";
+  progress.appendChild(progressFill);
+
+  const buttonRail = document.createElement("div");
+  buttonRail.className = "control-button-rail";
+
   const connectButton = document.createElement("button");
   connectButton.type = "button";
   connectButton.className = "control-button control-connect";
@@ -33,18 +48,11 @@ export function createPlayerControlsShell() {
     </svg>
   `;
 
-  const progress = document.createElement("div");
-  progress.className = "control-progress";
-  progress.setAttribute("aria-hidden", "true");
-
-  const progressFill = document.createElement("div");
-  progressFill.className = "control-progress-fill";
-  progress.appendChild(progressFill);
-
   const statusDot = document.createElement("span");
   statusDot.className = "control-status";
   statusDot.setAttribute("aria-hidden", "true");
 
-  controls.append(connectButton, playButton, skipButton, progress, statusDot);
-  return { controls, connectButton, playButton, skipButton, progressFill, statusDot };
+  buttonRail.append(connectButton, playButton, skipButton);
+  controls.append(record, progress, buttonRail, statusDot);
+  return { controls, record, connectButton, playButton, skipButton, progressFill, statusDot };
 }

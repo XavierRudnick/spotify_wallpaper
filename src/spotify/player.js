@@ -1,8 +1,10 @@
 import {
+  fetchAlbumTracks,
   fetchDevices,
   fetchPlaybackState,
   pausePlayback,
   playContext,
+  playTrack,
   resumePlayback,
   skipToNext
 } from "./api.js";
@@ -14,10 +16,18 @@ function resolveActiveDevice(devicesPayload) {
   return devices.find((device) => device.is_active) ?? devices[0] ?? null;
 }
 
+function pickAlbumImage(images) {
+  if (!Array.isArray(images) || images.length === 0) {
+    return "";
+  }
+  return images[2]?.url ?? images[1]?.url ?? images[0]?.url ?? "";
+}
+
 export function createPlayerController({ getAccessToken, onState }) {
   let lastDeviceId = null;
   let noDeviceTimer = 0;
   let disposed = false;
+  const albumTracksCache = new Map();
 
   const emit = (patch) => {
     onState?.(patch);
@@ -78,10 +88,15 @@ export function createPlayerController({ getAccessToken, onState }) {
 
     try {
       const state = await fetchPlaybackState({ accessToken: token });
+      const track = state?.item ?? null;
+      const album = track?.album ?? null;
       emit({
         isPlaying: Boolean(state?.is_playing),
         progressMs: Number(state?.progress_ms ?? 0),
-        durationMs: Number(state?.item?.duration_ms ?? 0)
+        durationMs: Number(track?.duration_ms ?? 0),
+        trackUri: track?.uri ?? "",
+        albumId: album?.id ?? "",
+        albumImageUrl: pickAlbumImage(album?.images)
       });
       return state;
     } catch {
@@ -175,10 +190,78 @@ export function createPlayerController({ getAccessToken, onState }) {
     }
   }
 
+  async function fetchAlbumTrackList(albumId) {
+    if (!albumId) {
+      return [];
+    }
+
+    if (albumTracksCache.has(albumId)) {
+      return albumTracksCache.get(albumId);
+    }
+
+    const token = await authToken();
+    if (!token) {
+      return [];
+    }
+
+    try {
+      const payload = await fetchAlbumTracks({ accessToken: token, albumId, limit: 50, offset: 0 });
+      const tracks = (payload?.items ?? [])
+        .map((item, index) => ({
+          id: String(item?.id ?? item?.uri ?? `${albumId}-${index + 1}`),
+          uri: String(item?.uri ?? ""),
+          trackNumber: Number(item?.track_number ?? index + 1)
+        }))
+        .filter((item) => item.uri)
+        .slice(0, 24);
+
+      albumTracksCache.set(albumId, tracks);
+      return tracks;
+    } catch {
+      return [];
+    }
+  }
+
+  async function playSong(trackUri) {
+    if (!trackUri) {
+      return false;
+    }
+
+    const token = await authToken();
+    if (!token) {
+      return false;
+    }
+
+    const device = (await checkDevice({ silent: true })) ?? (lastDeviceId ? { id: lastDeviceId } : null);
+    if (!device?.id) {
+      emit({ noDevice: true });
+      return false;
+    }
+
+    try {
+      await playTrack({
+        accessToken: token,
+        trackUri,
+        deviceId: device.id
+      });
+      emit({ isPlaying: true, noDevice: false, trackUri });
+      window.setTimeout(() => {
+        refreshPlaybackState();
+      }, 280);
+      return true;
+    } catch {
+      emit({ noDevice: true });
+      scheduleDeviceRetry();
+      return false;
+    }
+  }
+
   return {
     checkDevice,
     refreshPlaybackState,
     playAlbum,
+    fetchAlbumTrackList,
+    playSong,
     togglePlayPause,
     nextTrack,
     dispose() {

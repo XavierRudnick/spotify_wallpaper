@@ -37,6 +37,7 @@ function clearHoverState(track) {
       "is-neighbor-after-2"
     );
   }
+  track.dataset.hovering = "0";
 }
 
 export function wireRowHoverState(rows) {
@@ -56,6 +57,7 @@ export function wireRowHoverState(rows) {
       tile.nextElementSibling?.classList.add("is-neighbor-after");
       tile.previousElementSibling?.previousElementSibling?.classList.add("is-neighbor-before-2");
       tile.nextElementSibling?.nextElementSibling?.classList.add("is-neighbor-after-2");
+      track.dataset.hovering = "1";
     });
 
     track.addEventListener("pointerleave", () => {

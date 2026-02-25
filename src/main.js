@@ -5,6 +5,7 @@ import { readRowsCache, startRowsSync } from "./spotify/content.js";
 import { createPlayerController } from "./spotify/player.js";
 import { createRowsShell } from "./ui/rows.js";
 import { createPlayerControlsShell } from "./ui/playerControls.js";
+import { createSongCubesShell, paintSongCubes } from "./ui/songCubes.js";
 import { startRowScroller } from "./ui/rowScroller.js";
 import { enforceIconOnlyUi, wireRowHoverState } from "./ui/interactions.js";
 
@@ -33,10 +34,11 @@ const reducedMotion = resolveReducedMotion();
 document.body.classList.toggle("reduced-motion", reducedMotion);
 
 const { element: rowsSection, rows } = createRowsShell();
-const { controls: controlsSection, connectButton, playButton, skipButton, progressFill, statusDot } =
+const { controls: controlsSection, record, connectButton, playButton, skipButton, progressFill, statusDot } =
   createPlayerControlsShell();
+const { container: songCubesSection, grid: songCubesGrid } = createSongCubesShell();
 
-wallpaper.append(rowsSection, controlsSection);
+wallpaper.append(rowsSection, controlsSection, songCubesSection);
 
 enforceIconOnlyUi(document.body);
 wireRowHoverState(rows);
@@ -49,6 +51,12 @@ let progressModel = {
   progressMs: 0,
   durationMs: 0,
   stamp: performance.now()
+};
+let songCubeModel = {
+  albumId: "",
+  currentTrackUri: "",
+  tracks: [],
+  loadingAlbumId: ""
 };
 
 function stopPlaybackLoops() {
@@ -135,6 +143,17 @@ function paintPlaybackState(state) {
   playButton.classList.toggle("is-no-device", Boolean(state.noDevice));
   skipButton.classList.toggle("is-no-device", Boolean(state.noDevice));
   statusDot.classList.toggle("is-warning", Boolean(state.noDevice));
+  record.classList.toggle("is-spinning", Boolean(state.isPlaying));
+
+  if (typeof state.albumImageUrl === "string") {
+    if (state.albumImageUrl) {
+      record.style.setProperty("--record-cover", `url("${state.albumImageUrl}")`);
+      record.classList.add("has-cover");
+    } else {
+      record.style.removeProperty("--record-cover");
+      record.classList.remove("has-cover");
+    }
+  }
 
   if (typeof state.progressMs === "number") {
     progressModel.progressMs = Math.max(0, state.progressMs);
@@ -147,6 +166,52 @@ function paintPlaybackState(state) {
   }
   progressModel.stamp = performance.now();
   renderProgress(progressModel.stamp);
+}
+
+function repaintSongCubes() {
+  songCubesSection.classList.toggle("is-hidden", songCubeModel.tracks.length === 0);
+  paintSongCubes(songCubesGrid, songCubeModel.tracks, songCubeModel.currentTrackUri, (trackUri) => {
+    player?.playSong(trackUri);
+  });
+}
+
+async function syncSongCubesFromPlaybackState(state) {
+  if (!player) {
+    songCubeModel = { albumId: "", currentTrackUri: "", tracks: [], loadingAlbumId: "" };
+    repaintSongCubes();
+    return;
+  }
+
+  if (typeof state?.trackUri === "string" && state.trackUri !== songCubeModel.currentTrackUri) {
+    songCubeModel.currentTrackUri = state.trackUri;
+    repaintSongCubes();
+  }
+
+  const hasAlbumId = Object.prototype.hasOwnProperty.call(state ?? {}, "albumId");
+  if (!hasAlbumId) {
+    return;
+  }
+
+  const nextAlbumId = typeof state?.albumId === "string" ? state.albumId : "";
+  if (!nextAlbumId) {
+    return;
+  }
+
+  if (nextAlbumId === songCubeModel.albumId || nextAlbumId === songCubeModel.loadingAlbumId) {
+    return;
+  }
+
+  songCubeModel.loadingAlbumId = nextAlbumId;
+  const tracks = await player.fetchAlbumTrackList(nextAlbumId);
+
+  if (songCubeModel.loadingAlbumId !== nextAlbumId) {
+    return;
+  }
+
+  songCubeModel.albumId = nextAlbumId;
+  songCubeModel.loadingAlbumId = "";
+  songCubeModel.tracks = tracks;
+  repaintSongCubes();
 }
 
 async function initAuth() {
@@ -179,6 +244,7 @@ async function initAuth() {
       onState: (state) => {
         paintPlaybackState(state);
         paintAuthState({ ...auth.status(), ...state });
+        void syncSongCubesFromPlaybackState(state);
       }
     });
     player.checkDevice();
@@ -208,6 +274,7 @@ async function initAuth() {
       player = null;
       stopPlaybackLoops();
       paintPlaybackState({ isPlaying: false, noDevice: false });
+      void syncSongCubesFromPlaybackState({});
       paintAuthState(auth.status());
       return;
     }

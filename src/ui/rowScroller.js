@@ -287,8 +287,9 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
     lastTick = now;
 
     for (const row of runtimeRows) {
+      const isHovering = row.track.dataset.hovering === "1";
       const shouldDampen = row.pointerActive || now < row.holdAmbientUntil;
-      const targetAmbient = shouldDampen ? 0.08 : 1;
+      const targetAmbient = isHovering ? 0 : shouldDampen ? 0.08 : 1;
       row.ambientFactor += (targetAmbient - row.ambientFactor) * Math.min(1, deltaSeconds * 5);
 
       row.dragSpeed *= Math.pow(0.12, deltaSeconds);

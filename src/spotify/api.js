@@ -97,6 +97,17 @@ export async function fetchDevices({ accessToken }) {
   return spotifyGet({ accessToken, path: "/me/player/devices" });
 }
 
+export async function fetchAlbumTracks({ accessToken, albumId, limit = 50, offset = 0 }) {
+  if (!albumId) {
+    throw new Error("Missing album id.");
+  }
+
+  return spotifyGet({
+    accessToken,
+    path: `/albums/${encodeURIComponent(albumId)}/tracks?limit=${Math.min(50, Math.max(1, limit))}&offset=${Math.max(0, offset)}`
+  });
+}
+
 export async function playContext({ accessToken, contextUri, deviceId }) {
   const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : "";
   return spotifyPut({
@@ -127,5 +138,18 @@ export async function skipToNext({ accessToken, deviceId }) {
   return spotifyPost({
     accessToken,
     path: `/me/player/next${query}`
+  });
+}
+
+export async function playTrack({ accessToken, trackUri, deviceId }) {
+  if (!trackUri) {
+    throw new Error("Missing track URI.");
+  }
+
+  const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : "";
+  return spotifyPut({
+    accessToken,
+    path: `/me/player/play${query}`,
+    body: { uris: [trackUri] }
   });
 }
