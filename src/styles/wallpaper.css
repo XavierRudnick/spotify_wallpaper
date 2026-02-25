@@ -162,93 +162,6 @@
   /* animation: record-spin 11s linear infinite; */
 }
 
-.control-soundbar {
-  position: fixed;
-  left: clamp(188px, 17.6vw, 340px);
-  bottom: clamp(20px, 2.8vh, 36px);
-  z-index: 19;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  align-items: flex-end;
-  column-gap: clamp(1px, 0.11vw, 3px);
-  width: clamp(322px, 35vw, 728px);
-  height: clamp(31px, 6vh, 67px);
-  opacity: 0.7;
-  pointer-events: none;
-  mask-image: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 1) 8%,
-    rgba(0, 0, 0, 1) 92%,
-    rgba(0, 0, 0, 0) 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 1) 8%,
-    rgba(0, 0, 0, 1) 92%,
-    rgba(0, 0, 0, 0) 100%
-  );
-  transition: opacity 220ms ease;
-}
-
-.control-soundbar.is-disabled {
-  opacity: 0.2;
-}
-
-.control-soundbar-bar {
-  width: 100%;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(255, 255, 255, 0.92) 36%,
-    rgba(255, 255, 255, 0.76) 74%,
-    rgba(255, 255, 255, 0.58) 100%
-  );
-  transform-origin: center bottom;
-  transform: scaleY(0.08);
-  opacity: 0.18;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.2));
-}
-
-.control-soundbar.is-active .control-soundbar-bar {
-  opacity: 0.95;
-  animation: soundbar-wave-a 520ms ease-in-out infinite;
-}
-
-.control-soundbar.is-active .control-soundbar-bar:nth-child(2n) {
-  animation-name: soundbar-wave-b;
-  animation-duration: 420ms;
-}
-
-.control-soundbar.is-active .control-soundbar-bar:nth-child(3n) {
-  animation-name: soundbar-wave-c;
-  animation-duration: 720ms;
-}
-
-.control-soundbar.is-active .control-soundbar-bar:nth-child(4n) {
-  animation-delay: -140ms;
-}
-
-.control-soundbar.is-active .control-soundbar-bar:nth-child(5n) {
-  animation-delay: -260ms;
-}
-
-.control-soundbar.is-active .control-soundbar-bar:nth-child(7n) {
-  animation-delay: -380ms;
-}
-
-.control-soundbar.is-active .control-soundbar-bar:nth-child(9n) {
-  animation-duration: 860ms;
-}
-
-.control-soundbar.is-active .control-soundbar-bar:nth-child(11n) {
-  animation-duration: 340ms;
-}
-
 .control-button {
   width: 28px;
   height: 28px;
@@ -464,54 +377,6 @@
   }
 }
 
-@keyframes soundbar-wave-a {
-  0% {
-    transform: scaleY(0.08);
-  }
-  35% {
-    transform: scaleY(0.96);
-  }
-  70% {
-    transform: scaleY(0.44);
-  }
-  100% {
-    transform: scaleY(0.16);
-  }
-}
-
-@keyframes soundbar-wave-b {
-  0% {
-    transform: scaleY(0.1);
-  }
-  30% {
-    transform: scaleY(0.74);
-  }
-  62% {
-    transform: scaleY(0.28);
-  }
-  100% {
-    transform: scaleY(0.86);
-  }
-}
-
-@keyframes soundbar-wave-c {
-  0% {
-    transform: scaleY(0.22);
-  }
-  25% {
-    transform: scaleY(0.92);
-  }
-  55% {
-    transform: scaleY(0.18);
-  }
-  82% {
-    transform: scaleY(0.62);
-  }
-  100% {
-    transform: scaleY(0.3);
-  }
-}
-
 @keyframes record-spin {
   from {
     transform: rotate(0deg);
@@ -527,13 +392,11 @@
   .control-button,
   .control-status,
   .control-progress-fill,
-  .control-soundbar,
   .song-cube {
     transition: none;
   }
 
   .control-status.is-syncing,
-  .control-soundbar.is-active .control-soundbar-bar,
   .song-cube:hover,
   .control-record.is-spinning::after {
     animation: none;
@@ -545,13 +408,11 @@ body.reduced-motion .tile-cover,
 body.reduced-motion .control-button,
 body.reduced-motion .control-status,
 body.reduced-motion .control-progress-fill,
-body.reduced-motion .control-soundbar,
 body.reduced-motion .song-cube {
   transition: none;
 }
 
 body.reduced-motion .control-status.is-syncing,
-body.reduced-motion .control-soundbar.is-active .control-soundbar-bar,
 body.reduced-motion .song-cube:hover,
 body.reduced-motion .control-record.is-spinning::after {
   animation: none;

@@ -34,7 +34,7 @@ const reducedMotion = resolveReducedMotion();
 document.body.classList.toggle("reduced-motion", reducedMotion);
 
 const { element: rowsSection, rows } = createRowsShell();
-const { controls: controlsSection, record, soundbar, connectButton, playButton, skipButton, progressFill, statusDot } =
+const { controls: controlsSection, record, connectButton, playButton, skipButton, progressFill, statusDot } =
   createPlayerControlsShell();
 const { container: songCubesSection, grid: songCubesGrid } = createSongCubesShell();
 
@@ -133,7 +133,6 @@ function paintAuthState(state) {
   statusDot.classList.toggle("is-disconnected", !state.connected);
   statusDot.classList.toggle("is-missing-config", !state.hasClientId);
   statusDot.classList.toggle("is-warning", Boolean(state.noDevice));
-  soundbar.classList.toggle("is-disabled", !state.connected || Boolean(state.noDevice));
   connectButton.classList.toggle("is-ready", state.connected);
   playButton.classList.toggle("is-ready", state.connected && !state.noDevice);
   skipButton.classList.toggle("is-ready", state.connected && !state.noDevice);
@@ -145,7 +144,6 @@ function paintPlaybackState(state) {
   skipButton.classList.toggle("is-no-device", Boolean(state.noDevice));
   statusDot.classList.toggle("is-warning", Boolean(state.noDevice));
   record.classList.toggle("is-spinning", Boolean(state.isPlaying));
-  soundbar.classList.toggle("is-active", Boolean(state.isPlaying) && !state.noDevice);
 
   if (typeof state.albumImageUrl === "string") {
     if (state.albumImageUrl) {
