@@ -330,8 +330,10 @@ export function startRowScroller(rows, { onTileClick, motionFactor = 1 } = {}) {
 
       row.pool = items;
       warmRowImages(items);
-      row.leftIndex = row.leftIndex % row.pool.length;
+      row.leftIndex = 0;
       assignTileCount(row);
+      row.offset = -row.tileSpan * (row.leftBufferTiles + row.entryPeekRatio);
+      row.track.style.transform = `translate3d(${row.offset.toFixed(3)}px, 0, 0)`;
       hydrateRowProgressively(row);
     },
     setPaused(nextPaused) {

@@ -9,7 +9,7 @@ import { readCache, writeCache } from "./cache.js";
 import { dedupeAlbums, normalizeAlbumItem } from "./models.js";
 
 const CACHE_KEY = "rows:v1";
-const SAVED_ALPHA_CACHE_KEY = "rows:saved-alpha:v1";
+const SAVED_ALPHA_CACHE_KEY = "rows:saved-alpha:v2";
 const CACHE_TTL_MS = 20 * 60 * 1000;
 const REFRESH_MS = 20 * 60 * 1000;
 const RETRY_BASE_MS = 2000;
@@ -105,18 +105,40 @@ function normalizeSaved(payload) {
   );
 }
 
+function readFirstChar(albumName) {
+  return String(albumName ?? "").trim().charAt(0);
+}
+
+function classifyFirstChar(albumName) {
+  const first = readFirstChar(albumName);
+  if (!first) {
+    return { kind: "unknown", upper: "" };
+  }
+
+  if (/[0-9]/.test(first)) {
+    return { kind: "digit", upper: first };
+  }
+
+  const upper = first.toUpperCase();
+  if (upper >= "A" && upper <= "Z") {
+    return { kind: "latin", upper };
+  }
+
+  return { kind: "unknown", upper: "" };
+}
+
 function resolveAlphabetBucket(albumName) {
-  const first = String(albumName ?? "").trim().charAt(0).toUpperCase();
-  if (first >= "A" && first <= "G") {
+  const first = classifyFirstChar(albumName);
+  if (first.kind === "digit") {
     return "recent";
   }
-  if (first >= "H" && first <= "O") {
+  if (first.kind === "latin" && first.upper >= "A" && first.upper <= "G") {
+    return "recent";
+  }
+  if (first.kind === "latin" && first.upper >= "H" && first.upper <= "O") {
     return "saved";
   }
-  if (first >= "P" && first <= "Z") {
-    return "suggested";
-  }
-  return "saved";
+  return "suggested";
 }
 
 function splitSavedRowsByAlphabet(savedAlbums) {
@@ -131,6 +153,26 @@ function splitSavedRowsByAlphabet(savedAlbums) {
       return byName;
     }
     return String(left?.id ?? "").localeCompare(String(right?.id ?? ""));
+  };
+  const byRecentOrder = (left, right) => {
+    const leftType = classifyFirstChar(left?.albumName).kind;
+    const rightType = classifyFirstChar(right?.albumName).kind;
+    const leftRank = leftType === "digit" ? 0 : 1;
+    const rightRank = rightType === "digit" ? 0 : 1;
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank;
+    }
+    return byAlbumNameAsc(left, right);
+  };
+  const bySuggestedOrder = (left, right) => {
+    const leftType = classifyFirstChar(left?.albumName).kind;
+    const rightType = classifyFirstChar(right?.albumName).kind;
+    const leftRank = leftType === "unknown" ? 1 : 0;
+    const rightRank = rightType === "unknown" ? 1 : 0;
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank;
+    }
+    return byAlbumNameAsc(left, right);
   };
 
   const groups = {
@@ -165,9 +207,9 @@ function splitSavedRowsByAlphabet(savedAlbums) {
     groups.suggested = savedAlbums.slice(0, fallbackChunk);
   }
 
-  groups.recent.sort(byAlbumNameAsc);
+  groups.recent.sort(byRecentOrder);
   groups.saved.sort(byAlbumNameAsc);
-  groups.suggested.sort(byAlbumNameAsc);
+  groups.suggested.sort(bySuggestedOrder);
 
   return groups;
 }
