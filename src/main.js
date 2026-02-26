@@ -1,7 +1,15 @@
 import "./styles/base.css";
 import "./styles/wallpaper.css";
 import { createSpotifyAuthSession } from "./spotify/auth_pkce.js";
-import { readRowsCache, startRowsSync } from "./spotify/content.js";
+import {
+  fetchRowsFromSpotify,
+  fetchSavedOnlyRowsFromSpotify,
+  readRowsCache,
+  readSavedOnlyRowsCache,
+  startRowsSync,
+  writeRowsCache,
+  writeSavedOnlyRowsCache
+} from "./spotify/content.js";
 import { createPlayerController } from "./spotify/player.js";
 import { createRowsShell } from "./ui/rows.js";
 import { createPlayerControlsShell } from "./ui/playerControls.js";
@@ -34,8 +42,17 @@ const reducedMotion = resolveReducedMotion();
 document.body.classList.toggle("reduced-motion", reducedMotion);
 
 const { element: rowsSection, rows } = createRowsShell();
-const { controls: controlsSection, record, connectButton, playButton, skipButton, progressFill, statusDot } =
-  createPlayerControlsShell();
+const {
+  controls: controlsSection,
+  record,
+  connectButton,
+  playButton,
+  skipButton,
+  progressFill,
+  statusDot,
+  modeDefaultButton,
+  modeSavedButton
+} = createPlayerControlsShell();
 const { container: songCubesSection, grid: songCubesGrid } = createSongCubesShell();
 
 wallpaper.append(rowsSection, controlsSection, songCubesSection);
@@ -57,6 +74,11 @@ let songCubeModel = {
   currentTrackUri: "",
   tracks: [],
   loadingAlbumId: ""
+};
+let rowMode = "default";
+let rowDataByMode = {
+  default: null,
+  savedOnly: null
 };
 
 function stopPlaybackLoops() {
@@ -126,6 +148,15 @@ function applyRowData(rowData) {
   if (Array.isArray(rowData.suggested) && rowData.suggested.length > 0) {
     runtime.setRowItems("suggested", rowData.suggested);
   }
+}
+
+function paintRowMode() {
+  modeDefaultButton.classList.toggle("is-active", rowMode === "default");
+  modeSavedButton.classList.toggle("is-active", rowMode === "savedOnly");
+}
+
+function applyCurrentRowMode() {
+  applyRowData(rowDataByMode[rowMode]);
 }
 
 function paintAuthState(state) {
@@ -215,18 +246,142 @@ async function syncSongCubesFromPlaybackState(state) {
 }
 
 async function initAuth() {
+  const MODE_LONG_PRESS_MS = 560;
   const auth = await createSpotifyAuthSession();
   let sync = null;
+  let loadingDefaultRows = false;
+  let loadingSavedOnly = false;
 
   const cached = readRowsCache({ allowStale: true });
-  applyRowData(cached);
+  rowDataByMode.default = cached;
+  rowDataByMode.savedOnly = readSavedOnlyRowsCache({ allowStale: true });
+  applyCurrentRowMode();
+  paintRowMode();
+
+  const ensureSavedOnlyRows = async ({ force = false } = {}) => {
+    if (loadingSavedOnly) {
+      return rowDataByMode.savedOnly;
+    }
+    if (!force && rowDataByMode.savedOnly) {
+      return rowDataByMode.savedOnly;
+    }
+
+    loadingSavedOnly = true;
+    modeSavedButton.classList.add("is-loading");
+
+    try {
+      const accessToken = await auth.getAccessToken();
+      if (!accessToken) {
+        return rowDataByMode.savedOnly;
+      }
+      const rowsData = await fetchSavedOnlyRowsFromSpotify(accessToken);
+      rowDataByMode.savedOnly = rowsData;
+      writeSavedOnlyRowsCache(rowsData);
+      return rowsData;
+    } catch {
+      return rowDataByMode.savedOnly;
+    } finally {
+      loadingSavedOnly = false;
+      modeSavedButton.classList.remove("is-loading");
+    }
+  };
+
+  const forceRefreshDefaultRows = async () => {
+    if (loadingDefaultRows) {
+      return rowDataByMode.default;
+    }
+
+    loadingDefaultRows = true;
+    modeDefaultButton.classList.add("is-loading");
+
+    try {
+      const accessToken = await auth.getAccessToken();
+      if (!accessToken) {
+        return rowDataByMode.default;
+      }
+      const rowsData = await fetchRowsFromSpotify(accessToken);
+      rowDataByMode.default = rowsData;
+      writeRowsCache(rowsData);
+      return rowsData;
+    } catch {
+      return rowDataByMode.default;
+    } finally {
+      loadingDefaultRows = false;
+      modeDefaultButton.classList.remove("is-loading");
+    }
+  };
+
+  const wireModeButtonPress = (button, { onShortPress, onLongPress }) => {
+    let pressTimer = 0;
+    let pressedPointerId = null;
+    let longPressHandled = false;
+    let suppressNextClick = false;
+
+    const clearPressTimer = () => {
+      if (!pressTimer) {
+        return;
+      }
+      window.clearTimeout(pressTimer);
+      pressTimer = 0;
+    };
+
+    button.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      pressedPointerId = event.pointerId;
+      longPressHandled = false;
+      clearPressTimer();
+      pressTimer = window.setTimeout(async () => {
+        longPressHandled = true;
+        suppressNextClick = true;
+        await onLongPress?.();
+      }, MODE_LONG_PRESS_MS);
+    });
+
+    button.addEventListener("pointerup", (event) => {
+      if (pressedPointerId !== event.pointerId) {
+        return;
+      }
+      pressedPointerId = null;
+      clearPressTimer();
+      if (!longPressHandled) {
+        onShortPress?.();
+      }
+    });
+
+    const cancelPress = (event) => {
+      if (pressedPointerId !== null && pressedPointerId !== event.pointerId) {
+        return;
+      }
+      pressedPointerId = null;
+      clearPressTimer();
+    };
+
+    button.addEventListener("pointercancel", cancelPress);
+    button.addEventListener("pointerleave", cancelPress);
+    button.addEventListener("click", (event) => {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        event.preventDefault();
+        return;
+      }
+      if (event.detail === 0) {
+        onShortPress?.();
+      }
+    });
+  };
 
   const startSync = () => {
     sync?.stop();
     sync = startRowsSync({
       getAccessToken: auth.getAccessToken,
       onData: (rowsData) => {
-        applyRowData(rowsData);
+        rowDataByMode.default = rowsData;
+        if (rowMode === "default") {
+          applyRowData(rowsData);
+        }
       },
       onState: ({ mode }) => {
         statusDot.classList.toggle("is-syncing", mode === "loading");
@@ -259,6 +414,40 @@ async function initAuth() {
   });
   skipButton.addEventListener("click", async () => {
     await player?.nextTrack();
+  });
+  wireModeButtonPress(modeDefaultButton, {
+    onShortPress: () => {
+      rowMode = "default";
+      paintRowMode();
+      applyCurrentRowMode();
+    },
+    onLongPress: async () => {
+      rowMode = "default";
+      paintRowMode();
+      const rowsData = await forceRefreshDefaultRows();
+      if (rowsData && rowMode === "default") {
+        applyRowData(rowsData);
+      }
+    }
+  });
+
+  wireModeButtonPress(modeSavedButton, {
+    onShortPress: async () => {
+      rowMode = "savedOnly";
+      paintRowMode();
+      const rowsData = await ensureSavedOnlyRows();
+      if (rowsData && rowMode === "savedOnly") {
+        applyRowData(rowsData);
+      }
+    },
+    onLongPress: async () => {
+      rowMode = "savedOnly";
+      paintRowMode();
+      const rowsData = await ensureSavedOnlyRows({ force: true });
+      if (rowsData && rowMode === "savedOnly") {
+        applyRowData(rowsData);
+      }
+    }
   });
 
   connectButton.addEventListener("click", async () => {

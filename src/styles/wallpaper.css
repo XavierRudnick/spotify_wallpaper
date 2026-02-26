@@ -230,6 +230,31 @@
   flex: 0 0 auto;
 }
 
+.control-mode-rail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.control-mode svg {
+  transform: none;
+  opacity: 0.34;
+}
+
+.control-mode:hover svg,
+.control-mode:focus-visible svg {
+  opacity: 0.78;
+}
+
+.control-mode.is-active svg {
+  opacity: 0.96;
+}
+
+.control-mode.is-loading svg {
+  animation: status-pulse 900ms ease-in-out infinite;
+}
+
 .control-progress {
   flex: 1 1 auto;
   max-width: 460px;

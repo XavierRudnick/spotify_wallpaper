@@ -9,6 +9,7 @@ import { readCache, writeCache } from "./cache.js";
 import { dedupeAlbums, normalizeAlbumItem } from "./models.js";
 
 const CACHE_KEY = "rows:v1";
+const SAVED_ALPHA_CACHE_KEY = "rows:saved-alpha:v1";
 const CACHE_TTL_MS = 20 * 60 * 1000;
 const REFRESH_MS = 20 * 60 * 1000;
 const RETRY_BASE_MS = 2000;
@@ -92,14 +93,109 @@ function normalizeSaved(payload) {
           return null;
         }
 
-        return normalizeAlbumItem({
+        const normalized = normalizeAlbumItem({
           id: album.id,
           uri: album.uri,
           images: album.images
         });
+        normalized.albumName = String(album?.name ?? "");
+        return normalized;
       })
       .filter(Boolean)
   );
+}
+
+function resolveAlphabetBucket(albumName) {
+  const first = String(albumName ?? "").trim().charAt(0).toUpperCase();
+  if (first >= "A" && first <= "G") {
+    return "recent";
+  }
+  if (first >= "H" && first <= "O") {
+    return "saved";
+  }
+  if (first >= "P" && first <= "Z") {
+    return "suggested";
+  }
+  return "saved";
+}
+
+function splitSavedRowsByAlphabet(savedAlbums) {
+  const byAlbumNameAsc = (left, right) => {
+    const leftName = String(left?.albumName ?? "");
+    const rightName = String(right?.albumName ?? "");
+    const byName = leftName.localeCompare(rightName, undefined, {
+      sensitivity: "base",
+      numeric: true
+    });
+    if (byName !== 0) {
+      return byName;
+    }
+    return String(left?.id ?? "").localeCompare(String(right?.id ?? ""));
+  };
+
+  const groups = {
+    recent: [],
+    saved: [],
+    suggested: []
+  };
+
+  for (const album of savedAlbums) {
+    groups[resolveAlphabetBucket(album?.albumName)].push(album);
+  }
+
+  if (savedAlbums.length === 0) {
+    return groups;
+  }
+
+  const fallbackChunk = Math.max(1, Math.ceil(savedAlbums.length / 3));
+  if (groups.recent.length === 0) {
+    groups.recent = savedAlbums.slice(0, fallbackChunk);
+  }
+  if (groups.saved.length === 0) {
+    groups.saved = savedAlbums.slice(fallbackChunk, fallbackChunk * 2);
+  }
+  if (groups.suggested.length === 0) {
+    groups.suggested = savedAlbums.slice(fallbackChunk * 2);
+  }
+
+  if (groups.saved.length === 0) {
+    groups.saved = savedAlbums.slice(0, fallbackChunk);
+  }
+  if (groups.suggested.length === 0) {
+    groups.suggested = savedAlbums.slice(0, fallbackChunk);
+  }
+
+  groups.recent.sort(byAlbumNameAsc);
+  groups.saved.sort(byAlbumNameAsc);
+  groups.suggested.sort(byAlbumNameAsc);
+
+  return groups;
+}
+
+async function fetchAllSavedAlbums(accessToken, { pageSize = 50, maxPages = 80 } = {}) {
+  const items = [];
+  let offset = 0;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const payload = await fetchSavedAlbums({
+      accessToken,
+      limit: pageSize,
+      offset
+    });
+    const chunk = payload?.items ?? [];
+    if (chunk.length === 0) {
+      break;
+    }
+
+    items.push(...chunk);
+
+    if (!payload?.next) {
+      break;
+    }
+    offset += pageSize;
+  }
+
+  return { items };
 }
 
 function normalizeSuggested(payload) {
@@ -220,6 +316,22 @@ export function readRowsCache({ allowStale = false } = {}) {
 
 export function writeRowsCache(rows) {
   writeCache(CACHE_KEY, rows);
+}
+
+export async function fetchSavedOnlyRowsFromSpotify(accessToken) {
+  const saved = await fetchAllSavedAlbums(accessToken);
+  const normalizedSaved = normalizeSaved(saved);
+  return splitSavedRowsByAlphabet(normalizedSaved);
+}
+
+export function readSavedOnlyRowsCache({ allowStale = false } = {}) {
+  return readCache(SAVED_ALPHA_CACHE_KEY, {
+    maxAgeMs: allowStale ? Number.POSITIVE_INFINITY : CACHE_TTL_MS
+  });
+}
+
+export function writeSavedOnlyRowsCache(rows) {
+  writeCache(SAVED_ALPHA_CACHE_KEY, rows);
 }
 
 export function startRowsSync({ getAccessToken, onData, onState }) {

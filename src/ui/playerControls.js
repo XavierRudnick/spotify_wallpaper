@@ -14,6 +14,29 @@ export function createPlayerControlsShell() {
   progressFill.className = "control-progress-fill";
   progress.appendChild(progressFill);
 
+  const modeRail = document.createElement("div");
+  modeRail.className = "control-mode-rail";
+
+  const modeDefaultButton = document.createElement("button");
+  modeDefaultButton.type = "button";
+  modeDefaultButton.className = "control-button control-mode control-mode-default is-active";
+  modeDefaultButton.setAttribute("aria-label", "rows-default-mode");
+  modeDefaultButton.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M3 5h18v3H3zM3 10.5h18v3H3zM3 16h18v3H3z"></path>
+    </svg>
+  `;
+
+  const modeSavedButton = document.createElement("button");
+  modeSavedButton.type = "button";
+  modeSavedButton.className = "control-button control-mode control-mode-saved";
+  modeSavedButton.setAttribute("aria-label", "rows-saved-mode");
+  modeSavedButton.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Zm-2 13.2-3.3-3.3 1.4-1.4 1.9 1.9 5-5 1.4 1.4Z"></path>
+    </svg>
+  `;
+
   const buttonRail = document.createElement("div");
   buttonRail.className = "control-button-rail";
 
@@ -52,7 +75,18 @@ export function createPlayerControlsShell() {
   statusDot.className = "control-status";
   statusDot.setAttribute("aria-hidden", "true");
 
+  modeRail.append(modeDefaultButton, modeSavedButton);
   buttonRail.append(connectButton, playButton, skipButton);
-  controls.append(record, progress, buttonRail, statusDot);
-  return { controls, record, connectButton, playButton, skipButton, progressFill, statusDot };
+  controls.append(record, modeRail, progress, buttonRail, statusDot);
+  return {
+    controls,
+    record,
+    connectButton,
+    playButton,
+    skipButton,
+    progressFill,
+    statusDot,
+    modeDefaultButton,
+    modeSavedButton
+  };
 }
